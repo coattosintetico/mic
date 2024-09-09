@@ -1,0 +1,16 @@
+[[source]]
+url = "https://artifactory.klarna.net/artifactory/api/pypi/r-pypi-pypi-org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+sounddevice = "*"
+scipy = "*"
+pyperclip = "*"
+openai = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.12"
+python_full_version = "3.12.5"
