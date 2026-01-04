@@ -1,0 +1,23 @@
+[project]
+name = "mic"
+version = "0.1.0"
+description = "Record and transcribe audio from the terminal using OpenAI Whisper"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "openai>=2.14.0",
+    "ruff>=0.14.10",
+    "scipy>=1.16.3",
+    "sounddevice>=0.5.3",
+]
+
+[project.scripts]
+mic = "main:main"
+
+[tool.ruff]
+# default one (88) seems a little bit tighter for me
+line-length = 120
+
+[tool.ruff.lint]
+# indicates ruff to only do linting for import-related checks
+select = ["I"]
