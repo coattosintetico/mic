@@ -23,7 +23,7 @@ class AudioRecorder:
         self.start_time = time.time()
         self.recording = sd.rec(int(self.duration * self.fs), samplerate=self.fs, channels=self.channels)
         while not self.stop_event.is_set():
-            sd.sleep(500)  # Check every half-second if the stop event is set
+            sd.sleep(50)  # Check every 50ms if the stop event is set
         sd.stop()
 
     def start_recording(self):
@@ -49,36 +49,57 @@ class AudioRecorder:
 
 def main():
     print("Initializing microphones...")
+    client = OpenAI()
     recorder = AudioRecorder()
 
     print("🎤 Recording! (press Enter to stop)", end="")
     recorder.start_recording()
     input()
     recorder.stop_recording()
-    print("🎬 Recording stopped.")
+
+    spinner_chars = r"\|/-"
+    spinner_idx = 0
+    spinner_stop = threading.Event()
+
+    def spinner():
+        nonlocal spinner_idx
+        while not spinner_stop.is_set():
+            print(f"\rProcessing {spinner_chars[spinner_idx % 4]}", end="", flush=True)
+            spinner_idx += 1
+            time.sleep(0.1)
+
+    spinner_thread = threading.Thread(target=spinner)
+    spinner_thread.start()
 
     AUDIO_PATH = "/tmp/output.wav"
     recorder.save_recording(AUDIO_PATH)
 
-    client = OpenAI()
-
     with open(AUDIO_PATH, "rb") as audio_file:
-        print("Sending to OpenAI to transcript...")
-        transcription = client.audio.transcriptions.create(
+        stream = client.audio.transcriptions.create(
             model="gpt-4o-transcribe",
             file=audio_file,
-            # response_format="text",
-        )
-        print("-" * 20 + "\n\n" + transcription.text + "\n\n" + "-" * 20)
-
-        print(
-            "(Cost: "
-            + str(transcription.usage.input_tokens * 6 / 1e6 + transcription.usage.output_tokens * 20 / 1e6)
-            + " $)"
+            response_format="text",
+            stream=True,
         )
 
-        subprocess.run(["xclip", "-sel", "c"], input=transcription.text.encode("utf-8"))
-        print("Transcript copied to clipboard.")
+        full_transcript = ""
+        first_chunk = True
+        for event in stream:
+            if event.type == "transcript.text.delta":
+                if first_chunk:
+                    spinner_stop.set()
+                    spinner_thread.join()
+                    print("\r" + " " * 15 + "\r", end="")  # Clear spinner line
+                    print("-" * 20)
+                    print()
+                    first_chunk = False
+                print(event.delta, end="", flush=True)
+                full_transcript += event.delta
+
+    print("\n\n" + "-" * 20)
+
+    subprocess.run(["xclip", "-sel", "c"], input=full_transcript.encode("utf-8"))
+    print("Transcript copied to clipboard.")
 
 
 if __name__ == "__main__":
