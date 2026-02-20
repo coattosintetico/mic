@@ -2,59 +2,64 @@ import subprocess
 import threading
 import time
 
-print("Importing openai module...")
-from openai import OpenAI
-
-print("Importing the rest of the modules...")
-import scipy.io.wavfile as wav
-import sounddevice as sd
-
 
 class AudioRecorder:
-    def __init__(self, fs=44100, channels=1, duration=600):
+    def __init__(self, fs=44100, channels=1):
         self.fs = fs
         self.channels = channels
-        self.duration = duration
-        self.recording = None
-        self.start_time = None
-        self.stop_event = threading.Event()
-
-    def record_audio(self):
-        self.start_time = time.time()
-        self.recording = sd.rec(int(self.duration * self.fs), samplerate=self.fs, channels=self.channels)
-        while not self.stop_event.is_set():
-            sd.sleep(50)  # Check every 50ms if the stop event is set
-        sd.stop()
+        self._chunks = []
 
     def start_recording(self):
-        self.thread = threading.Thread(target=self.record_audio)
-        self.thread.start()
+        import sounddevice as sd
+
+        self._chunks = []
+
+        def callback(indata, frames, time_info, status):
+            self._chunks.append(indata.copy())
+
+        self._stream = sd.InputStream(samplerate=self.fs, channels=self.channels, callback=callback)
+        self._stream.start()
 
     def stop_recording(self):
-        self.stop_event.set()
-        self.thread.join()  # Wait for the recording thread to finish
-        end_time = time.time()
-        actual_duration = end_time - self.start_time
-        self.trim_recording(actual_duration)
+        # stop() halts the stream; close() releases the device.
+        # After stop(), sounddevice guarantees no more callbacks will fire.
+        self._stream.stop()
+        self._stream.close()
 
-    def trim_recording(self, actual_duration):
-        # Calculate the number of samples for the actual duration
-        num_samples = int(self.fs * actual_duration)
-        # Trim the recording to the actual duration
-        self.recording = self.recording[:num_samples]
+    def get_audio_buffer(self):
+        # Only call this after stop_recording() — _chunks must be stable.
+        import io
 
-    def save_recording(self, filename):
-        wav.write(filename, self.fs, self.recording)  # Save as WAV file
+        import numpy as np
+        import scipy.io.wavfile as wav
+
+        buf = io.BytesIO()
+        recording = np.concatenate(self._chunks, axis=0)
+        wav.write(buf, self.fs, recording)
+        buf.seek(0)
+        buf.name = "audio.wav"  # OpenAI SDK uses .name for MIME-type detection
+        return buf
 
 
 def main():
-    print("Initializing microphones...")
-    client = OpenAI()
     recorder = AudioRecorder()
-
-    print("🎤 Recording! (press Enter to stop)", end="")
     recorder.start_recording()
+
+    # Kick off the openai import in the background while the user is speaking.
+    # Python's per-module import lock ensures this is safe: if main reaches
+    # `from openai import OpenAI` before this thread finishes, it will simply
+    # block until the lock is released — identical to a normal import.
+    def _preload_openai():
+        import openai  # side-effect: caches module in sys.modules
+
+    preload_thread = threading.Thread(target=_preload_openai, daemon=True)
+    preload_thread.start()
+
+    print("🎤 Recording! (press Enter to stop)", end="", flush=True)
     input()
+
+    # stop() + close() guarantee the InputStream callback thread is done,
+    # so _chunks is fully stable for get_audio_buffer() below.
     recorder.stop_recording()
 
     spinner_chars = r"\|/-"
@@ -68,33 +73,39 @@ def main():
             spinner_idx += 1
             time.sleep(0.1)
 
+    # Start the spinner before joining preload_thread so the user sees
+    # activity even if openai hasn't finished importing yet.
     spinner_thread = threading.Thread(target=spinner)
     spinner_thread.start()
 
-    AUDIO_PATH = "/tmp/output.wav"
-    recorder.save_recording(AUDIO_PATH)
+    preload_thread.join()  # openai is in sys.modules after this
+    from openai import OpenAI
 
-    with open(AUDIO_PATH, "rb") as audio_file:
-        stream = client.audio.transcriptions.create(
-            model="gpt-4o-transcribe",
-            file=audio_file,
-            response_format="text",
-            stream=True,
-        )
+    client = OpenAI()
 
-        full_transcript = ""
-        first_chunk = True
-        for event in stream:
-            if event.type == "transcript.text.delta":
-                if first_chunk:
-                    spinner_stop.set()
-                    spinner_thread.join()
-                    print("\r" + " " * 15 + "\r", end="")  # Clear spinner line
-                    print("-" * 20)
-                    print()
-                    first_chunk = False
-                print(event.delta, end="", flush=True)
-                full_transcript += event.delta
+    # Build the WAV in memory — no disk round-trip needed.
+    audio_buffer = recorder.get_audio_buffer()
+
+    stream = client.audio.transcriptions.create(
+        model="gpt-4o-transcribe",
+        file=audio_buffer,
+        response_format="text",
+        stream=True,
+    )
+
+    full_transcript = ""
+    first_chunk = True
+    for event in stream:
+        if event.type == "transcript.text.delta":
+            if first_chunk:
+                spinner_stop.set()
+                spinner_thread.join()
+                print("\r" + " " * 15 + "\r", end="")  # Clear spinner line
+                print("-" * 20)
+                print()
+                first_chunk = False
+            print(event.delta, end="", flush=True)
+            full_transcript += event.delta
 
     print("\n\n" + "-" * 20)
 
