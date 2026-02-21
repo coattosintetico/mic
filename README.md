@@ -55,3 +55,7 @@ The script will:
 - `openai` — API client for Whisper transcription
 - `sounddevice` — microphone access
 - `scipy` — WAV file handling
+
+## Development links
+
+- [OpenAI docs for transcription API](https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create)

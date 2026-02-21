@@ -7,3 +7,6 @@ run:
 	@uv run python main.py
 .PHONY: run
 
+install:
+	@uv tool install -e .
+.PHONY: install

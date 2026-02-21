@@ -9,10 +9,11 @@ dependencies = [
     "ruff>=0.14.10",
     "scipy>=1.16.3",
     "sounddevice>=0.5.3",
+    "typer>=0.24.1",
 ]
 
 [project.scripts]
-mic = "main:main"
+mic = "main:app"
 
 [tool.ruff]
 # default one (88) seems a little bit tighter for me

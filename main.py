@@ -1,6 +1,16 @@
 import subprocess
 import threading
 import time
+from enum import Enum
+from pathlib import Path
+from typing import Annotated, Optional
+
+import typer
+
+
+class Language(str, Enum):
+    en = "en"
+    es = "es"
 
 
 class AudioRecorder:
@@ -41,26 +51,38 @@ class AudioRecorder:
         return buf
 
 
-def main():
-    recorder = AudioRecorder()
-    recorder.start_recording()
+app = typer.Typer()
 
-    # Kick off the openai import in the background while the user is speaking.
-    # Python's per-module import lock ensures this is safe: if main reaches
-    # `from openai import OpenAI` before this thread finishes, it will simply
-    # block until the lock is released — identical to a normal import.
+
+@app.command()
+def main(
+    model: Annotated[str, typer.Option(help="Transcription model to use.")] = "gpt-4o-transcribe",
+    input_file: Annotated[Optional[Path], typer.Option("-i", "--input", help="Audio file to transcribe instead of recording.")] = None,
+    language: Annotated[Optional[Language], typer.Option("-l", "--language", help="Language of the audio (ISO-639-1).")] = None,
+):
+    # Kick off the openai import in the background while the user is speaking
+    # (or while they wait). Python's per-module import lock ensures this is
+    # safe: if main reaches `from openai import OpenAI` before this thread
+    # finishes, it will simply block until the lock is released.
     def _preload_openai():
         import openai  # side-effect: caches module in sys.modules
 
     preload_thread = threading.Thread(target=_preload_openai, daemon=True)
     preload_thread.start()
 
-    print("🎤 Recording! (press Enter to stop)", end="", flush=True)
-    input()
+    if input_file is not None:
+        audio_buffer = open(input_file, "rb")
+    else:
+        recorder = AudioRecorder()
+        recorder.start_recording()
 
-    # stop() + close() guarantee the InputStream callback thread is done,
-    # so _chunks is fully stable for get_audio_buffer() below.
-    recorder.stop_recording()
+        print("🎤 Recording! (press Enter to stop)", end="", flush=True)
+        input()
+
+        # stop() + close() guarantee the InputStream callback thread is done,
+        # so _chunks is fully stable for get_audio_buffer() below.
+        recorder.stop_recording()
+        audio_buffer = recorder.get_audio_buffer()
 
     spinner_chars = r"\|/-"
     spinner_idx = 0
@@ -83,14 +105,12 @@ def main():
 
     client = OpenAI()
 
-    # Build the WAV in memory — no disk round-trip needed.
-    audio_buffer = recorder.get_audio_buffer()
-
     stream = client.audio.transcriptions.create(
-        model="gpt-4o-transcribe",
+        model=model,
         file=audio_buffer,
         response_format="text",
         stream=True,
+        **({"language": language.value} if language is not None else {}),
     )
 
     full_transcript = ""
@@ -114,4 +134,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    app()
