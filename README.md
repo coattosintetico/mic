@@ -1,61 +1,57 @@
 # mic
 
-Record and transcribe audio from the terminal using OpenAI Whisper.
-
-## Features
-
-- Records audio until you press Enter
-- Transcribes using `gpt-4o-transcribe` model
-- Automatically copies the transcript to clipboard
-- Shows usage cost per transcription
+Record audio (quickly) from the command line, transcribe it with whisper and copy it to clipboard.
 
 ## Requirements
 
-- Python 3.12+
-- Linux with `xclip` installed (for clipboard support)
-- OpenAI API key set as `OPENAI_API_KEY` environment variable
+[uv](https://docs.astral.sh/uv/) — install it with:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
 
 ## Installation
 
-```bash
-# Clone the repository
-git clone https://github.com/your-username/mic.git
-cd mic
+Install the CLI globally:
 
-# Install dependencies with uv
-uv sync
+```bash
+just install-cli
 ```
 
-Or more conveniently:
+Or without [`just`](https://github.com/casey/just/):
 
 ```bash
 uv tool install -e .
 ```
 
+List possible just commands with:
+
+```
+just -l
+```
+
 ## Usage
 
 ```bash
-make run
+mic --help
 ```
 
-Or directly:
+You can also run without installing:
 
 ```bash
-uv run python main.py
+uv run mic --help
 ```
 
-The script will:
-1. Initialize your microphone
-2. Start recording (press Enter to stop)
-3. Send the audio to OpenAI for transcription
-4. Display the transcript and copy it to your clipboard
+or as a module (this runs the CLI):
 
-## Dependencies
+```bash
+uv run python -m mic --help
+```
 
-- `openai` — API client for Whisper transcription
-- `sounddevice` — microphone access
-- `scipy` — WAV file handling
+## Development
 
-## Development links
+Set up the development environment:
 
-- [OpenAI docs for transcription API](https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create)
+```bash
+just sync-dev
+```

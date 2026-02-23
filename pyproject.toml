@@ -1,24 +1,35 @@
 [project]
 name = "mic"
-version = "0.1.0"
-description = "Record and transcribe audio from the terminal using OpenAI Whisper"
+version = "0.2.0"
+description = "Record audio (quickly) from the command line, transcribe it with whisper and copy it to clipboard."
 readme = "README.md"
+authors = [
+    { name = "coattosintetico", email = "msanchezgonzalez99@gmail.com" }
+]
 requires-python = ">=3.12"
 dependencies = [
     "openai>=2.14.0",
-    "ruff>=0.14.10",
-    "scipy>=1.16.3",
-    "sounddevice>=0.5.3",
-    "typer>=0.24.1",
+    "typer",
 ]
 
 [project.scripts]
-mic = "main:app"
+mic = "mic.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "ruff",
+]
+
+[build-system]
+requires = ["uv_build>=0.10.4,<0.11.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [tool.ruff]
-# default one (88) seems a little bit tighter for me
 line-length = 120
 
 [tool.ruff.lint]
-# indicates ruff to only do linting for import-related checks
 select = ["I"]

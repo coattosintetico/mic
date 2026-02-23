@@ -1,0 +1,9 @@
+# Changes here will be overwritten by Copier
+_commit: 0.1.0
+_src_path: /home/kaneda/templates/python-typer-cli-template/
+author_email: msanchezgonzalez99@gmail.com
+author_name: coattosintetico
+min_python_version: '3.12'
+project_description: Record audio (quickly) from the command line, transcribe it with
+    whisper and copy it to clipboard.
+project_name: mic
