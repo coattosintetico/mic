@@ -7,11 +7,11 @@ import subprocess
 import time
 from pathlib import Path
 
-RECORDINGS_DIR = Path("/tmp/mic")
+RECORDINGS_DIR = Path(os.environ.get("TMPDIR", "/tmp")) / "mic"
 
 
 def _recording_path(ext: str) -> Path:
-    RECORDINGS_DIR.mkdir(exist_ok=True)
+    RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
     ts = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     return RECORDINGS_DIR / f"{ts}.{ext}"
 
