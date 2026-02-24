@@ -1,10 +1,19 @@
 """Audio recorders."""
 
+import datetime
 import os
 import platform
 import subprocess
-import tempfile
 import time
+from pathlib import Path
+
+RECORDINGS_DIR = Path("/tmp/mic")
+
+
+def _recording_path(ext: str) -> Path:
+    RECORDINGS_DIR.mkdir(exist_ok=True)
+    ts = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    return RECORDINGS_DIR / f"{ts}.{ext}"
 
 
 def is_termux() -> bool:
@@ -24,12 +33,11 @@ def _ffmpeg_input_args() -> list[str]:
 
 class FfmpegRecorder:
     def __init__(self):
-        fd, self._tmp_path = tempfile.mkstemp(suffix=".wav")
-        os.close(fd)
+        self._path = _recording_path("wav")
 
     def start_recording(self):
         self._proc = subprocess.Popen(
-            ["ffmpeg", "-y", *_ffmpeg_input_args(), self._tmp_path],
+            ["ffmpeg", "-y", *_ffmpeg_input_args(), str(self._path)],
             stdin=subprocess.PIPE,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -41,7 +49,7 @@ class FfmpegRecorder:
         self._proc.wait()
 
     def get_audio_buffer(self):
-        return open(self._tmp_path, "rb")
+        return open(self._path, "rb")
 
 
 class TermuxRecorder:
@@ -52,23 +60,21 @@ class TermuxRecorder:
     """
 
     def __init__(self):
-        fd, self._tmp_path = tempfile.mkstemp(suffix=".m4a")
-        os.close(fd)
-        os.unlink(self._tmp_path)
+        self._path = _recording_path("m4a")
 
     def start_recording(self):
-        subprocess.run(["termux-microphone-record", "-f", self._tmp_path], check=True, stdout=subprocess.DEVNULL)
+        subprocess.run(["termux-microphone-record", "-f", str(self._path)], check=True, stdout=subprocess.DEVNULL)
 
     def stop_recording(self):
         subprocess.run(["termux-microphone-record", "-q"], check=True, stdout=subprocess.DEVNULL)
 
     def get_audio_buffer(self):
         deadline = time.monotonic() + 10
-        while not os.path.exists(self._tmp_path):
+        while not self._path.exists():
             if time.monotonic() > deadline:
-                raise RuntimeError(f"Recording file never appeared: {self._tmp_path}")
+                raise RuntimeError(f"Recording file never appeared: {self._path}")
             time.sleep(0.1)
-        return open(self._tmp_path, "rb")
+        return open(self._path, "rb")
 
 
 def get_recorder():

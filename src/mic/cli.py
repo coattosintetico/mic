@@ -9,7 +9,7 @@ from typing import Annotated, Optional
 
 import typer
 
-from mic.recorder import get_recorder, is_termux
+from mic.recorder import RECORDINGS_DIR, get_recorder, is_termux
 
 app = typer.Typer(
     name="mic",
@@ -20,6 +20,15 @@ app = typer.Typer(
 class Language(str, Enum):
     en = "en"
     es = "es"
+
+
+def _find_latest_recording() -> Optional[Path]:
+    if not RECORDINGS_DIR.exists():
+        return None
+    files = list(RECORDINGS_DIR.glob("*.wav")) + list(RECORDINGS_DIR.glob("*.m4a"))
+    if not files:
+        return None
+    return max(files, key=lambda p: p.name)
 
 
 def _copy_to_clipboard(text: str) -> None:
@@ -38,6 +47,9 @@ def record(
     language: Annotated[
         Optional[Language], typer.Option("-l", "--language", help="Language of the audio (ISO-639-1).")
     ] = None,
+    use_latest: Annotated[
+        bool, typer.Option("--latest", "-L", help="Transcribe the latest recording in /tmp/mic instead of recording.")
+    ] = False,
 ):
     # Kick off the openai import in the background while the user is speaking.
     def _preload_openai():
@@ -45,6 +57,16 @@ def record(
 
     preload_thread = threading.Thread(target=_preload_openai, daemon=True)
     preload_thread.start()
+
+    if use_latest and input_file is not None:
+        raise typer.BadParameter("--latest and --input are mutually exclusive.")
+
+    if use_latest:
+        input_file = _find_latest_recording()
+        if input_file is None:
+            typer.echo("No recordings found in /tmp/mic.", err=True)
+            raise typer.Exit(1)
+        typer.echo(f"Using latest recording: {input_file.name}")
 
     if input_file is not None:
         audio_buffer = open(input_file, "rb")
