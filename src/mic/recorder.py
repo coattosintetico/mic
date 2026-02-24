@@ -4,6 +4,7 @@ import os
 import platform
 import subprocess
 import tempfile
+import time
 
 
 def is_termux() -> bool:
@@ -62,6 +63,11 @@ class TermuxRecorder:
         subprocess.run(["termux-microphone-record", "-q"], check=True, stdout=subprocess.DEVNULL)
 
     def get_audio_buffer(self):
+        deadline = time.monotonic() + 10
+        while not os.path.exists(self._tmp_path):
+            if time.monotonic() > deadline:
+                raise RuntimeError(f"Recording file never appeared: {self._tmp_path}")
+            time.sleep(0.1)
         return open(self._tmp_path, "rb")
 
 
