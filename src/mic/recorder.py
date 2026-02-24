@@ -51,7 +51,7 @@ class TermuxRecorder:
     """
 
     def __init__(self):
-        fd, self._tmp_path = tempfile.mkstemp(suffix=".wav")
+        fd, self._tmp_path = tempfile.mkstemp(suffix=".m4a")
         os.close(fd)
         os.unlink(self._tmp_path)
 
