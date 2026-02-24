@@ -56,10 +56,10 @@ class TermuxRecorder:
         os.unlink(self._tmp_path)
 
     def start_recording(self):
-        subprocess.run(["termux-microphone-record", "-f", self._tmp_path], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["termux-microphone-record", "-f", self._tmp_path], check=True, stdout=subprocess.DEVNULL)
 
     def stop_recording(self):
-        subprocess.run(["termux-microphone-record", "-q"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["termux-microphone-record", "-q"], check=True, stdout=subprocess.DEVNULL)
 
     def get_audio_buffer(self):
         return open(self._tmp_path, "rb")
