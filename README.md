@@ -48,6 +48,27 @@ or as a module (this runs the CLI):
 uv run python -m mic --help
 ```
 
+## Termux (Android)
+
+Install system dependencies and grant microphone permission to the Termux:API app in Android settings:
+
+```sh
+pkg install python termux-api just uv
+```
+
+Set the Android API level (required for building Rust-based dependencies):
+
+```sh
+echo 'export ANDROID_API_LEVEL=$(getprop ro.build.version.sdk)' >> ~/.bashrc
+source ~/.bashrc
+```
+
+Then install as usual:
+
+```sh
+just install-cli
+```
+
 ## Development
 
 Set up the development environment:

@@ -53,12 +53,13 @@ class TermuxRecorder:
     def __init__(self):
         fd, self._tmp_path = tempfile.mkstemp(suffix=".wav")
         os.close(fd)
+        os.unlink(self._tmp_path)
 
     def start_recording(self):
         subprocess.run(["termux-microphone-record", "-f", self._tmp_path], check=True)
 
     def stop_recording(self):
-        subprocess.run(["termux-microphone-record", "-e"], check=True)
+        subprocess.run(["termux-microphone-record", "-q"], check=True)
 
     def get_audio_buffer(self):
         return open(self._tmp_path, "rb")
