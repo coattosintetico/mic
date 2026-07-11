@@ -1,6 +1,6 @@
 [project]
 name = "mic"
-version = "0.2.0"
+version = "0.3.0"
 description = "Record audio (quickly) from the command line, transcribe it with whisper and copy it to clipboard."
 readme = "README.md"
 authors = [

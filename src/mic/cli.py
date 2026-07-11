@@ -9,6 +9,7 @@ from typing import Annotated, Optional
 
 import typer
 
+from mic.core import transcribe
 from mic.recorder import RECORDINGS_DIR, get_recorder, is_termux
 
 app = typer.Typer(
@@ -95,31 +96,31 @@ def record(
     spinner_thread.start()
 
     preload_thread.join()
-    from openai import OpenAI
 
-    client = OpenAI()
+    first_chunk = True
 
-    stream = client.audio.transcriptions.create(
+    def print_delta(delta: str) -> None:
+        nonlocal first_chunk
+        if first_chunk:
+            spinner_stop.set()
+            spinner_thread.join()
+            print("\r" + " " * 15 + "\r", end="")
+            print("-" * 20)
+            print()
+            first_chunk = False
+        print(delta, end="", flush=True)
+
+    full_transcript = transcribe(
+        audio_buffer,
         model=model,
-        file=audio_buffer,
-        response_format="text",
-        stream=True,
-        **({"language": language.value} if language is not None else {}),
+        language=language.value if language is not None else None,
+        on_delta=print_delta,
     )
 
-    full_transcript = ""
-    first_chunk = True
-    for event in stream:
-        if event.type == "transcript.text.delta":
-            if first_chunk:
-                spinner_stop.set()
-                spinner_thread.join()
-                print("\r" + " " * 15 + "\r", end="")
-                print("-" * 20)
-                print()
-                first_chunk = False
-            print(event.delta, end="", flush=True)
-            full_transcript += event.delta
+    if first_chunk:  # empty transcription: the spinner is still running
+        spinner_stop.set()
+        spinner_thread.join()
+        print("\r" + " " * 15 + "\r", end="")
 
     print("\n\n" + "-" * 20)
 
